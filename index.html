@@ -1,0 +1,107 @@
+      <!DOCTYPE html>
+<html>
+  <head>
+    <title>Single layer | CARTO</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:400,600,700|Open+Sans:300,400,600" rel="stylesheet">
+    <!-- Include Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.5.1/dist/leaflet.js"></script>
+    <link href="https://unpkg.com/leaflet@1.5.1/dist/leaflet.css" rel="stylesheet">
+    <!-- Include CARTO.js -->
+    <script src="https://libs.cartocdn.com/carto.js/v4.2.0/carto.min.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Montserrat:600" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans" rel="stylesheet">
+    <link href="https://carto.com/developers/carto-js/examples/maps/public/style.css" rel="stylesheet">
+  </head>
+  <body>
+    <div id="map">
+    </div>
+    <!-- Description -->
+    <aside class="toolbox">
+      <div class="box">
+        <header>
+          <h1>Philadelphia 311</h1>
+        </header>
+        <section>
+          <p class="description open-sans">Open right-of-way violations</p>
+        </section>
+        <footer class="js-footer"></footer>
+      </div>
+    </aside>
+
+    <script>
+      const map = L.map('map').setView([39.95, -75.179], 13);
+      //map.scrollWheelZoom.disable();
+
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png', {
+        maxZoom: 18
+      }).addTo(map);
+
+      const client = new carto.Client({
+        apiKey: 'default_public',
+        username: 'phl'
+      });
+
+      const source311 = new carto.source.SQL(`
+        SELECT *
+          FROM public_cases_fc
+          WHERE service_name='Right of Way Unit'
+          AND status='Open'
+      `);
+      const style = new carto.style.CartoCSS(`
+        #layer {
+          marker-width: 7;
+          marker-fill: #EE4D5A;
+          marker-line-color: #FFFFFF;
+        }
+      `);
+      const layer311 = new carto.layer.Layer(source311, style, {
+        featureOverColumns: ['address', 'updated_datetime', 'status_notes', 'media_url']
+      });
+
+      client.addLayer(layer311);
+      client.getLeafletLayer().addTo(map);
+
+      const popup = L.popup({ closeButton: false });
+
+      function openPopup(featureEvent) {
+        let content = '<div class="widget">';
+
+        if (featureEvent.data.address) {
+          content += `<h3 class="h3">${featureEvent.data.address}</h3>`;
+        }
+
+        if (featureEvent.data.updated_datetime) {
+          content += `<p class="open-sans"><span>'${featureEvent.data.updated_datetime}'</span></p>`;
+        }
+
+        if (featureEvent.data.media_url) {
+            content += `<img src="${featureEvent.data.media_url}" style="width:100%" />`
+        }
+
+        if (featureEvent.data.status_notes) {
+          content += `<p class="open-sans"><span>${featureEvent.data.status_notes}</span></p>`;
+        }
+
+        content += `</div>`;
+
+        popup.setContent(content);
+        popup.setLatLng(featureEvent.latLng);
+
+        if (!popup.isOpen()) {
+          popup.openOn(map);
+        }
+      }
+
+      function closePopUp(featureEvent) {
+            // remove popup from map object
+            popup.removeFrom(map)
+        }
+
+
+     layer311.on('featureClicked', openPopup);
+
+    </script>
+  </body>
+</html>
